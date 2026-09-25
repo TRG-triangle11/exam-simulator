@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>考试模拟器 · 模拟考场</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23a83c2c'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23f4ead0' font-family='Microsoft YaHei,sans-serif' font-weight='600'%3E%E8%80%83%3C/text%3E%3C/svg%3E">
+<!-- 字体：标题用华文中宋，正文用 HarmonyOS Sans SC（均取本机系统字体） -->
+<style>
+:root{
+  --paper:#f4ead0;
+  --paperDeep:#ecdcb4;
+  --paperLight:#faf3de;
+  --ink:#262015;
+  --inkSoft:#5c4f33;
+  --red:#a83c2c;
+  --redDeep:#8a2f21;
+  --gold:#c8a45c;
+  --chalk:#f2ecdb;
+  --board:#243229;
+  --boardEdge:#6d4f2e;
+  --line:#c9b682;
+  --font-display:'华文中宋','STZhongsong','SimSun','宋体','Songti SC',serif;
+  --font-body:'HarmonyOS Sans SC','HarmonyOS Sans','Microsoft YaHei UI','Microsoft YaHei','PingFang SC','Segoe UI',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font-body);
+  color:var(--chalk);
+  overflow-x:hidden;
+  background:#0b0e13;
+  -webkit-font-smoothing:antialiased;
+}
+/* ===== 背景 ===== */
+.bgimg{position:fixed;inset:0;z-index:-2;background:#0b0e13 url(assets/classroom.jpg) center/cover no-repeat;filter:brightness(1.06) saturate(1.02);}
+.veil{position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(ellipse at 50% 36%, rgba(12,14,20,.14) 0%, rgba(9,10,15,.48) 82%),
+             linear-gradient(180deg, rgba(8,9,13,.18), rgba(8,9,13,.4));}
+.grain{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
+/* ===== 页头 ===== */
+header{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:flex-end;
+  padding:14px 22px;background:linear-gradient(180deg, rgba(6,7,11,.62), rgba(6,7,11,0));}
+.hright{display:flex;align-items:center;gap:12px;}
+.bjclock{font-size:14px;letter-spacing:1.5px;color:#ece4c8;font-feature-settings:'tnum';
+  background:rgba(18,16,12,.5);border:1px solid rgba(236,228,200,.3);padding:7px 13px;border-radius:5px;white-space:nowrap;}
+.mutebtn{width:38px;height:38px;border-radius:50%;border:1px solid rgba(236,228,200,.35);background:rgba(18,16,12,.5);
+  color:#ece4c8;cursor:pointer;display:grid;place-items:center;transition:background .2s;}
+.mutebtn:hover{background:rgba(60,48,28,.7);}
+.mutebtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+/* ===== 视图容器 ===== */
+main{min-height:100vh;display:grid;place-items:center;padding:clamp(48px,6vh,88px) 20px clamp(20px,3vh,42px);}
+.view{display:none;width:100%;max-width:880px;animation:fadeIn .45s cubic-bezier(.22,1,.36,1);}
+.view.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.view{animation:none}}
+/* ===== 宣纸面板 ===== */
+.panel{position:relative;color:var(--ink);background:
+    repeating-linear-gradient(0deg, rgba(140,110,50,.035) 0 2px, transparent 2px 26px),
+    linear-gradient(180deg,var(--paperLight),var(--paper) 18%,var(--paperDeep));
+  border:1px solid #d6c391;border-radius:8px;box-shadow:0 30px 70px rgba(0,0,0,.55), inset 0 0 0 6px rgba(140,110,50,.07);
+  padding:clamp(20px,2.6vh,34px) 44px clamp(16px,2.4vh,32px);}
+.panel::before{content:"";position:absolute;inset:11px;border:1px solid rgba(150,110,50,.4);border-radius:4px;pointer-events:none;}
+.panel::after{content:"";position:absolute;inset:15px;border:1px solid rgba(150,110,50,.22);border-radius:3px;pointer-events:none;}
+h1.title{font-family:var(--font-display);font-weight:500;font-size:clamp(30px,4.2vh,44px);letter-spacing:6px;color:var(--ink);}
+.sub{color:var(--inkSoft);font-size:14px;letter-spacing:3px;margin:0 0 14px;}
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--line) 20%,var(--line) 80%,transparent);margin:12px 0;}
+.fieldlabel{display:flex;align-items:center;gap:9px;color:var(--redDeep);font-size:14px;letter-spacing:4px;margin-bottom:9px;}
+.fieldlabel::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent);}
+/* 时长选择 */
+.dur-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;}
+.dur-btn{border:1.5px solid #b9a678;background:rgba(255,252,240,.5);border-radius:7px;padding:10px 8px 10px;
+  cursor:pointer;text-align:center;transition:all .18s;font-family:var(--font-body);}
+.dur-btn:hover{border-color:var(--red);background:#f9ecdd;}
+.dur-btn .t{font-size:clamp(16px,2.3vh,21px);color:var(--ink);letter-spacing:2px;}
+.dur-btn .s{font-size:11px;color:#8a784e;margin-top:3px;letter-spacing:1px;}
+.dur-btn.active{border-color:var(--red);background:#f7e3d3;box-shadow:inset 0 0 0 1px var(--red);}
+.dur-btn.active .t{color:var(--redDeep);}
+.custom-row{margin-top:5px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.chip{border:1.5px solid #b9a678;background:rgba(255,252,240,.5);border-radius:999px;padding:8px 20px;font-size:14px;
+  cursor:pointer;letter-spacing:2px;color:var(--inkSoft);transition:all .18s;font-family:var(--font-body);}
+.chip.active{border-color:var(--red);background:#f7e3d3;color:var(--redDeep);box-shadow:inset 0 0 0 1px var(--red);}
+.custom-inputs{display:none;align-items:center;gap:10px;}
+.custom-inputs.show{display:flex;}
+.custom-inputs input{width:76px;padding:9px 6px;text-align:center;font-size:17px;font-family:var(--font-body);
+  color:var(--ink);background:rgba(255,252,240,.65);border:1.5px solid #b9a678;border-radius:6px;font-feature-settings:'tnum';}
+.custom-inputs input:focus{outline:2px solid var(--red);outline-offset:1px;border-color:var(--red);}
+.custom-inputs label{font-size:14px;color:var(--inkSoft);}
+/* 科目与名称 */
+.form-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:22px;}
+select,input[type=text]{width:100%;padding:8px 12px;font-size:15.5px;font-family:var(--font-body);color:var(--ink);
+  background:rgba(255,252,240,.65);border:1.5px solid #b9a678;border-radius:6px;}
+select:focus,input[type=text]:focus{outline:2px solid var(--red);outline-offset:1px;border-color:var(--red);}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#8a784e 50%),linear-gradient(135deg,#8a784e 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;}
+.hint{font-size:12px;color:#8a784e;margin-top:4px;letter-spacing:.5px;}
+/* 开始按钮 */
+.start-btn{margin-top:14px;width:100%;padding:12px;background:linear-gradient(180deg,#b8442f,var(--red) 55%,var(--redDeep));
+  color:#f8eed6;font-family:var(--font-display);font-weight:500;font-size:22px;letter-spacing:8px;border:none;border-radius:7px;cursor:pointer;
+  box-shadow:0 6px 0 #6e2417, 0 14px 26px rgba(120,32,18,.45);transition:transform .12s,box-shadow .12s,filter .2s;}
+.start-btn:hover{filter:brightness(1.08);}
+.start-btn:active{transform:translateY(5px);box-shadow:0 1px 0 #6e2417;}
+.prep-check{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:14px;color:var(--ink);letter-spacing:.5px;cursor:pointer;user-select:none;}
+.prep-check input{width:17px;height:17px;accent-color:var(--red);cursor:pointer;flex:none;}
+.prep-check .pnote{color:#8a784e;font-size:12.5px;letter-spacing:.5px;}
+/* ===== 黑板 ===== */
+.board{background:linear-gradient(180deg,#2c4035,#223029);color:var(--chalk);border-radius:9px;padding:15px 24px 14px;
+  text-align:center;border:7px solid var(--boardEdge);box-shadow:inset 0 0 34px rgba(0,0,0,.4), 0 16px 34px rgba(0,0,0,.45);position:relative;}
+.board::before{content:"";position:absolute;left:16px;right:16px;top:8px;height:2px;background:rgba(255,255,255,.09);border-radius:2px;}
+.board .btitle{font-family:var(--font-display);font-weight:500;font-size:28px;letter-spacing:4px;}
+.board .bsub{margin-top:8px;font-size:14px;color:#cfd8c4;letter-spacing:2.5px;line-height:1.8;}
+.board .bsub.subj-name{font-family:var(--font-display);font-weight:500;font-size:34px;color:#f6f0dc;letter-spacing:10px;margin-top:10px;}
+/* 计时区 */
+.timer-stage{text-align:center;padding:22px 0 4px;}
+.phase-tag{display:inline-block;color:var(--redDeep);border:1.5px solid var(--red);border-radius:999px;
+  padding:6px 20px;font-size:14.5px;font-weight:500;letter-spacing:3px;background:rgba(246,227,211,.55);}
+.big-timer{font-family:var(--font-body);font-weight:500;font-size:clamp(58px,11.5vw,124px);line-height:1.15;color:#ffffff;
+  letter-spacing:2px;font-feature-settings:'tnum';margin-top:8px;text-shadow:0 2px 16px rgba(0,0,0,.6);}
+.timer-label{color:#ece4ca;font-size:14px;letter-spacing:6px;margin-top:4px;}
+.pbar{max-width:560px;margin:16px auto 0;height:6px;background:rgba(120,100,50,.28);border-radius:4px;overflow:hidden;}
+.pbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--redDeep),var(--red));border-radius:4px;transition:width .5s linear;}
+.submit-wrap{display:flex;justify-content:center;margin-top:18px;}
+.ghost-btn{background:transparent;border:1.5px solid rgba(38,32,21,.5);color:var(--inkSoft);border-radius:6px;
+  padding:10px 26px;font-size:14.5px;letter-spacing:3px;cursor:pointer;font-family:var(--font-body);transition:all .18s;}
+.ghost-btn:hover{border-color:var(--red);color:var(--redDeep);background:rgba(246,227,211,.4);}
+/* ===== 结束页 ===== */
+.end-list{margin:6px 0 4px;font-size:15.5px;color:var(--ink);line-height:2.6;letter-spacing:.5px;}
+.end-list b{font-weight:400;color:var(--redDeep);}
+.back-btn{margin-top:30px;width:100%;padding:15px;background:var(--ink);color:var(--paperLight);
+  font-family:var(--font-display);font-weight:500;font-size:19px;letter-spacing:6px;border:none;border-radius:7px;cursor:pointer;
+  box-shadow:0 5px 0 #0e0b06, 0 12px 24px rgba(0,0,0,.4);transition:transform .12s,box-shadow .12s,background .2s;}
+.back-btn:hover{background:#3a3226;}
+.back-btn:active{transform:translateY(4px);box-shadow:0 1px 0 #0e0b06;}
+.big-end{font-family:var(--font-display);font-weight:500;font-size:clamp(52px,9vw,80px);letter-spacing:10px;text-align:center;color:var(--ink);margin:8px 0 6px;}
+/* ===== 预警横幅 ===== */
+.warn-banner{position:fixed;top:66px;left:50%;transform:translate(-50%,-320%);z-index:45;
+  background:linear-gradient(180deg,#c24a34,#a83c2c);color:#fdf3dc;padding:13px 30px;border-radius:7px;
+  font-family:var(--font-body);font-weight:600;font-size:18px;letter-spacing:2px;box-shadow:0 12px 30px rgba(120,25,12,.5);
+  border:1px solid #e8b08a;transition:transform .45s cubic-bezier(.22,1,.36,1);white-space:nowrap;}
+.warn-banner.show{transform:translate(-50%,0);}
+.warn-banner.pulse{animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 12px 30px rgba(120,25,12,.5)}50%{box-shadow:0 12px 42px rgba(190,45,20,.85)}}
+/* ===== 模态 ===== */
+.modal{position:fixed;inset:0;z-index:60;display:none;place-items:center;background:rgba(8,9,13,.66);padding:20px;}
+.modal.show{display:grid;}
+.modal .panel{max-width:430px;width:100%;padding:36px 38px 34px;text-align:center;}
+.modal .panel::before,.modal .panel::after{display:none;}
+.modal h3{font-family:var(--font-body);font-weight:600;font-size:22px;letter-spacing:3px;color:var(--ink);}
+.modal p{margin-top:14px;font-size:15px;color:var(--inkSoft);line-height:2;letter-spacing:.5px;}
+.modal .btns{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:26px;}
+.modal .cancel{background:transparent;border:1.5px solid #b9a678;color:var(--inkSoft);border-radius:6px;padding:12px;font-size:15px;letter-spacing:3px;cursor:pointer;font-family:var(--font-body);}
+.modal .confirm{background:var(--red);border:none;color:#f8eed6;border-radius:6px;padding:12px;font-size:15px;letter-spacing:3px;cursor:pointer;font-family:var(--font-body);box-shadow:0 4px 0 var(--redDeep);}
+.modal .confirm:active{transform:translateY(3px);box-shadow:0 1px 0 var(--redDeep);}
+/* ===== 全屏按钮（右下角，鼠标靠近浮现；全屏时鼠标自动隐藏） ===== */
+#fsBtn{position:fixed;right:20px;bottom:20px;z-index:55;
+  padding:9px 22px;border:1px solid rgba(255,255,255,.25);border-radius:20px;
+  background:rgba(14,16,22,.62);color:rgba(255,255,255,.84);font-size:13px;letter-spacing:.14em;
+  font-family:var(--font-body);cursor:pointer;opacity:0;
+  transition:opacity .25s ease,background .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+#fsBtn.show{opacity:1}
+#fsBtn:hover{background:rgba(168,60,44,.88);color:#fff}
+html.fs-idle,html.fs-idle *{cursor:none !important}
+@media (hover:none){#fsBtn{display:none}}
+/* ===== 响应式 ===== */
+@media (max-width:680px){
+  main{padding:78px 14px 32px;}
+  .panel{padding:24px 18px 22px;}
+  h1.title{font-size:30px;letter-spacing:4px;}
+
+  .bjclock{font-size:12.5px;padding:6px 9px;}
+  .dur-grid{gap:8px;}
+  .dur-btn{padding:13px 4px 11px;}
+  .dur-btn .t{font-size:16.5px;}
+  .form-grid{grid-template-columns:1fr;gap:14px;}
+  .big-timer{font-size:clamp(60px,19vw,96px);}
+  .board .btitle{font-size:21px;letter-spacing:4px;}
+  .board .bsub.subj-name{font-size:27px;letter-spacing:6px;}
+  .warn-banner{font-size:15px;letter-spacing:2px;padding:11px 20px;white-space:normal;width:88%;text-align:center;}
+}
+@media (max-width:400px){
+  .dur-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="bgimg" role="img" aria-label="高考考场背景"></div>
+<div class="veil"></div>
+<div class="grain"></div>
+
+<header>
+  <div class="hright">
+    <span class="bjclock">--:--:--</span>
+    <button id="muteBtn" class="mutebtn" role="switch" aria-checked="false" title="声音开关" aria-label="声音开关">
+      <svg id="iconOn" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M15.5 8.8a4.4 4.4 0 0 1 0 6.4"/><path d="M18.3 6a8.6 8.6 0 0 1 0 12"/></svg>
+      <svg id="iconOff" viewBox="0 0 24 24" style="display:none"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l5 5"/><path d="M21 9l-5 5"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- ===== 视图：设置 ===== -->
+  <section id="view-setup" class="view active">
+    <div class="panel">
+      <h1 class="title">考试模拟器</h1>
+      <div class="sub">模拟考场 · 沉浸作答 · 提前适应</div>
+
+      <div class="fieldlabel">考试时长</div>
+      <div class="dur-grid">
+        <button class="dur-btn" data-sec="9000" type="button">
+          <div class="t">2小时30分</div>
+          <div class="s">语文</div>
+        </button>
+        <button class="dur-btn active" data-sec="7200" type="button">
+          <div class="t">2小时</div>
+          <div class="s">标准</div>
+        </button>
+        <button class="dur-btn" data-sec="4500" type="button">
+          <div class="t">1小时15分</div>
+          <div class="s">再选科目常用</div>
+        </button>
+      </div>
+      <div class="custom-row">
+        <button id="customChip" class="chip" type="button">自定义时长</button>
+        <div id="customInputs" class="custom-inputs">
+          <input id="customH" type="number" min="0" max="6" value="1" aria-label="小时">
+          <label>小时</label>
+          <input id="customM" type="number" min="0" max="59" value="30" aria-label="分钟">
+          <label>分钟</label>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="form-grid">
+        <div>
+          <div class="fieldlabel">考试科目</div>
+          <select id="subjectSel">
+            <option>语文</option>
+            <option selected>数学</option>
+            <option>英语</option>
+            <option>物理</option>
+            <option>化学</option>
+            <option>生物</option>
+            <option>政治</option>
+            <option>历史</option>
+            <option>地理</option>
+            <option value="__custom__">自选科目</option>
+          </select>
+          <input id="subjectCustom" type="text" placeholder="输入科目名称" style="display:none;margin-top:9px">
+        </div>
+        <div>
+          <div class="fieldlabel">考试名称</div>
+          <input id="examName" type="text" value="2026年普通高等学校招生全国统一考试" maxlength="40">
+          <div class="hint">显示在考场黑板上，可改为周测、模考等名称</div>
+        </div>
+      </div>
+
+      <label class="prep-check">
+        <input type="checkbox" id="prepCheck" checked>
+        <span>考前准备 5 分钟（发放试卷、答题卡、填写信息）</span>
+        <span class="pnote">不勾选时 3 秒倒计时后直接开考</span>
+      </label>
+
+      <button id="startBtn" class="start-btn" type="button">开始考试</button>
+    </div>
+  </section>
+
+  <!-- ===== 视图：考前准备 ===== -->
+  <section id="view-prep" class="view">
+    <div class="board">
+      <div class="btitle" id="prepBoardTitle">考前准备</div>
+      <div class="bsub" id="prepBoardSub">请核对试卷与答题卡 · 填写姓名、准考证号 · 等待开考铃声</div>
+    </div>
+    <div class="timer-stage">
+      <span class="phase-tag" id="prepTag">准备倒计时</span>
+      <div id="prepTimer" class="big-timer">05:00</div>
+      <div class="timer-label">距离开考</div>
+    </div>
+    <div class="submit-wrap">
+      <button id="abortPrepBtn" class="ghost-btn" type="button">放弃本次考试</button>
+    </div>
+  </section>
+
+  <!-- ===== 视图：考试中 ===== -->
+  <section id="view-exam" class="view">
+    <div class="board">
+      <div class="btitle" id="examBoardName">普通高等学校招生全国统一考试</div>
+      <div class="bsub subj-name" id="examBoardSub">数学</div>
+    </div>
+    <div class="timer-stage">
+      <span class="phase-tag">答题倒计时</span>
+      <div id="examTimer" class="big-timer">02:00:00</div>
+      <div class="pbar"><i id="examBar"></i></div>
+    </div>
+    <div class="submit-wrap">
+      <button id="submitBtn" class="ghost-btn" type="button">提前交卷</button>
+    </div>
+  </section>
+
+  <!-- ===== 视图：考试结束 ===== -->
+  <section id="view-end" class="view">
+    <div class="panel" style="text-align:center">
+      <div class="big-end">考试结束</div>
+      <div class="sub" id="endStateSub" style="margin-bottom:16px">请停止作答，等待监考老师收卷</div>
+      <div class="end-list" id="endInfo"></div>
+      <button id="backBtn" class="back-btn" type="button">返回首页</button>
+    </div>
+  </section>
+</main>
+
+<div id="warnBanner" class="warn-banner">还剩最后十五分钟，请合理安排时间</div>
+
+<div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="panel">
+    <h3 id="modalTitle">提前交卷</h3>
+    <p id="modalText">确定要提前交卷吗？交卷后本次模拟考试结束，无法继续作答。</p>
+    <div class="btns">
+      <button id="modalCancel" class="cancel" type="button">继续作答</button>
+      <button id="modalConfirm" class="confirm" type="button">确定交卷</button>
+    </div>
+  </div>
+</div>
+
+<button id="fsBtn" title="全屏显示">全屏显示</button>
+
+<audio id="aStart" src="assets/voice_start_s.wav" preload="auto"></audio>
+<audio id="aWarn" src="assets/voice_15min_s.wav" preload="auto"></audio>
+<audio id="aEnd" src="assets/voice_end_s.wav" preload="auto"></audio>
+
+<script>
+(function(){
+  'use strict';
+  var $ = function(s){ return document.querySelector(s); };
+  var $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+  var state = {
+    phase: 'setup',          // setup | prep | exam | end
+    examSec: 7200,           // 作答时长（秒）
+    prepSec: 300,            // 考前准备 5 分钟
+    phaseEnd: 0,             // 当前阶段结束时间戳
+    examStart: 0,
+    warned15: false,
+    early: false,
+    muted: localStorage.getItem('examSimMuted') === '1',
+    customOn: false
+  };
+
+  var audioEls = { start: $('#aStart'), warn: $('#aWarn'), end: $('#aEnd') };
+  var actx = null, tickId = null;
+  var DUR_PRESETS = [9000, 7200, 4500];
+  var SUBJECT_DEFAULTS = { '语文':9000, '数学':7200, '英语':7200, '物理':4500, '化学':4500, '生物':4500, '政治':4500, '历史':4500, '地理':4500, '__custom__':7200 };
+
+  /* ---------- 视图切换 ---------- */
+  function switchView(v){
+    state.phase = v;
+    ['setup','prep','exam','end'].forEach(function(x){
+      $('#view-' + x).classList.toggle('active', x === v);
+    });
+    if (v === 'setup'){ state.warned15 = false; state.early = false; }
+    hideBanner();
+    hideModal();
+  }
+
+  /* ---------- 北京时间 ---------- */
+  function beijingStr(){
+    var p = new Intl.DateTimeFormat('zh-CN', { timeZone:'Asia/Shanghai', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }).formatToParts(new Date());
+    var h='00',m='00',s='00';
+    p.forEach(function(x){ if(x.type==='hour') h=x.value; if(x.type==='minute') m=x.value; if(x.type==='second') s=x.value; });
+    return h + ':' + m + ':' + s;
+  }
+  function renderClocks(){
+    var t = beijingStr();
+    $$('.bjclock').forEach(function(el){ el.textContent = t; });
+  }
+  renderClocks();
+  setInterval(renderClocks, 500);
+
+  /* ---------- 音频：铃声（Web Audio 合成） ---------- */
+  function ensureCtx(){
+    if (!actx){ var AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
+    if (actx && actx.state === 'suspended'){ actx.resume(); }
+    return actx;
+  }
+  function bell(strikes, opts){
+    if (state.muted) return;
+    var ctx = ensureCtx(); if (!ctx) return;
+    opts = opts || {};
+    var gap = opts.gap || 0.38, decay = opts.decay || 1.6, base = opts.base || 1760, vol = opts.vol || 0.5;
+    var t0 = ctx.currentTime + 0.03;
+    try {
+      for (var i = 0; i < strikes; i++){
+        var t = t0 + i * gap;
+        [1, 2.76, 4.07, 5.41].forEach(function(m, idx){
+          var o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = base * m;
+          var gv = idx === 0 ? vol : vol * 0.26 / Math.pow(idx, 1.35);
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(Math.max(gv, 0.0002), t + 0.009);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + decay * (1 - idx * 0.07));
+          o.connect(g); g.connect(ctx.destination);
+          o.start(t); o.stop(t + decay + 0.25);
+        });
+      }
+    } catch(e){}
+  }
+
+  /* ---------- 音频：人声 ---------- */
+  function playVoice(key){
+    if (state.muted) return;
+    var a = audioEls[key]; if (!a) return;
+    try { a.currentTime = 0; a.play().catch(function(){}); } catch(e){}
+  }
+  function unlockAudio(){
+    ensureCtx();
+    ['start','warn','end'].forEach(function(k){
+      var a = audioEls[k]; if (!a) return;
+      a.muted = true;
+      var p = a.play();
+      if (p && p.then){
+        p.then(function(){ a.pause(); a.currentTime = 0; a.muted = false; }).catch(function(){ a.muted = false; });
+      } else { a.muted = false; }
+    });
+  }
+
+  /* ---------- 静音开关 ---------- */
+  function applyMuteUI(){
+    var on = !state.muted;
+    $('#iconOn').style.display = on ? '' : 'none';
+    $('#iconOff').style.display = on ? 'none' : '';
+    $('#muteBtn').setAttribute('aria-checked', String(!state.muted));
+  }
+  $('#muteBtn').addEventListener('click', function(){
+    state.muted = !state.muted;
+    localStorage.setItem('examSimMuted', state.muted ? '1' : '0');
+    ['start','warn','end'].forEach(function(k){ var a=audioEls[k]; if(a){ a.pause(); } });
+    applyMuteUI();
+  });
+  applyMuteUI();
+
+  /* ---------- 计时格式 ---------- */
+  function fmtHM(sec){
+    sec = Math.max(0, sec);
+    var m = Math.floor(sec/60), s = sec%60;
+    return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  function fmtHMS(sec){
+    sec = Math.max(0, sec);
+    var h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  function fmtDuration(sec){
+    sec = Math.max(0, sec);
+    var h = Math.floor(sec/3600), m = Math.floor(sec%3600/60);
+    if (h > 0) return h + ' 小时' + (m>0 ? ' ' + m + ' 分' : '');
+    return m + ' 分钟';
+  }
+
+  /* ---------- 主计时循环 ---------- */
+  function startTicking(){ if (!tickId) tickId = setInterval(update, 250); }
+  function update(){
+    var now = Date.now();
+    if (state.phase === 'prep'){
+      var rem = Math.max(0, Math.ceil((state.phaseEnd - now)/1000));
+      $('#prepTimer').textContent = fmtHM(rem);
+      document.title = '考前准备 ' + fmtHM(rem) + ' · 考试模拟器';
+      if (rem <= 0) startExam();
+    } else if (state.phase === 'exam'){
+      var r2 = Math.max(0, Math.ceil((state.phaseEnd - now)/1000));
+      renderExam(r2);
+      if (!state.warned15 && r2 <= 900 && r2 > 0){
+        state.warned15 = true;
+        doWarn15();
+      }
+      if (r2 <= 0) endExam(false);
+    }
+  }
+  function renderExam(rem){
+    $('#examTimer').textContent = fmtHMS(rem);
+    $('#examBar').style.width = (rem / state.examSec * 100) + '%';
+    document.title = '剩余 ' + fmtHMS(rem) + ' · 考试模拟器';
+  }
+
+  /* ---------- 流程 ---------- */
+  function beginPrep(){
+    state.phaseEnd = Date.now() + state.prepSec * 1000;
+    $('#prepTimer').textContent = fmtHM(state.prepSec);
+    if (state.prepSec >= 300){
+      $('#prepBoardTitle').textContent = '考前准备';
+      $('#prepBoardSub').textContent = '请核对试卷与答题卡 · 填写姓名、准考证号 · 等待开考铃声';
+      $('#prepTag').textContent = '准备倒计时';
+    } else {
+      $('#prepBoardTitle').textContent = '即将开考';
+      $('#prepBoardSub').textContent = '请做好准备 · 3 秒后开始作答';
+      $('#prepTag').textContent = '开考倒计时';
+    }
+    switchView('prep');
+    bell(2, { gap: 0.42, decay: 1.2, vol: 0.42 });
+    startTicking();
+  }
+  function startExam(){
+    state.warned15 = false;
+    state.examStart = Date.now();
+    state.phaseEnd = state.examStart + state.examSec * 1000;
+    $('#examTimer').textContent = fmtHMS(state.examSec);
+    $('#examBar').style.width = '100%';
+    switchView('exam');
+    bell(3, { gap: 0.34, decay: 1.7, vol: 0.5 });
+    playVoice('start');
+    startTicking();
+  }
+  function doWarn15(){
+    bell(1, { decay: 1.8, vol: 0.4 });
+    playVoice('warn');
+    var b = $('#warnBanner');
+    b.classList.add('show','pulse');
+    setTimeout(function(){ b.classList.remove('show'); }, 12000);
+  }
+  function endExam(early){
+    state.early = early;
+    state.phase = 'end';
+    if (tickId){ clearInterval(tickId); tickId = null; }
+    document.title = '考试结束 · 考试模拟器';
+    switchView('end');
+    var spent = Math.round((Date.now() - state.examStart)/1000);
+    var subName = $('#subjectSel').value;
+    if (subName === '__custom__') subName = $('#subjectCustom').value || '自选科目';
+    var lines = [];
+    lines.push('考试科目：<b>' + subName + '</b>');
+    lines.push('考试时长：<b>' + fmtDuration(state.examSec) + '</b>');
+    lines.push('实际作答：<b>' + fmtDuration(spent) + '</b>');
+    lines.push('交卷时间：<b>' + beijingStr().replace(/^/,'北京时间 ') + '</b>');
+    $('#endInfo').innerHTML = lines.join('<br>');
+    $('#endStateSub').textContent = early ? '已提前交卷，本次模拟考试结束' : '请停止作答，等待监考老师收卷';
+    if (early){ bell(1, { decay: 1.4, vol: 0.35 }); }
+    else { bell(5, { gap: 0.32, decay: 2.0, vol: 0.55 }); playVoice('end'); }
+  }
+
+  /* ---------- 预警横幅 ---------- */
+  function hideBanner(){ $('#warnBanner').classList.remove('show','pulse'); }
+
+  /* ---------- 模态 ---------- */
+  function showModal(title, text, cancelLabel, confirmLabel){
+    $('#modalTitle').textContent = title;
+    $('#modalText').textContent = text;
+    $('#modalCancel').textContent = cancelLabel;
+    $('#modalConfirm').textContent = confirmLabel;
+    $('#modal').classList.add('show');
+  }
+  function hideModal(){ $('#modal').classList.remove('show'); }
+  $('#modalCancel').addEventListener('click', hideModal);
+  $('#modalConfirm').addEventListener('click', function(){
+    hideModal();
+    if (state.phase === 'prep'){ abortPrep(); }
+    else if (state.phase === 'exam'){ endExam(true); }
+  });
+  $('#modal').addEventListener('click', function(e){ if (e.target === this) hideModal(); });
+  function abortPrep(){
+    if (tickId){ clearInterval(tickId); tickId = null; }
+    document.title = '考试模拟器 · 模拟考场';
+    switchView('setup');
+  }
+
+  /* ---------- 设置页交互 ---------- */
+  var durBtns = $$('.dur-btn');
+  durBtns.forEach(function(b){
+    b.addEventListener('click', function(){
+      durBtns.forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      state.examSec = parseInt(b.getAttribute('data-sec'), 10);
+      setCustom(false);
+    });
+  });
+  function setCustom(on){
+    state.customOn = on;
+    $('#customChip').classList.toggle('active', on);
+    $('#customInputs').classList.toggle('show', on);
+    durBtns.forEach(function(x){ x.classList.remove('active'); });
+    if (!on){
+      durBtns.forEach(function(x){
+        if (parseInt(x.getAttribute('data-sec'),10) === state.examSec) x.classList.add('active');
+      });
+    }
+  }
+  $('#customChip').addEventListener('click', function(){ setCustom(!state.customOn); });
+  function readCustom(){
+    var h = parseInt($('#customH').value, 10) || 0;
+    var m = parseInt($('#customM').value, 10) || 0;
+    if (h > 6) h = 6;
+    if (m > 59) m = 59;
+    $('#customH').value = h; $('#customM').value = m;
+    return h * 3600 + m * 60;
+  }
+  ['customH','customM'].forEach(function(id){
+    $('#' + id).addEventListener('change', function(){
+      if (state.customOn){
+        var sec = readCustom();
+        if (sec >= 60) state.examSec = sec;
+      }
+    });
+  });
+
+  function applySubjectDefault(){
+    var def = SUBJECT_DEFAULTS[$('#subjectSel').value];
+    if (def){ state.examSec = def; setCustom(false); }
+  }
+  $('#subjectSel').addEventListener('change', function(){
+    var v = this.value;
+    $('#subjectCustom').style.display = (v === '__custom__') ? '' : 'none';
+    applySubjectDefault();
+  });
+
+  $('#startBtn').addEventListener('click', function(){
+    if (state.customOn){
+      var sec = readCustom();
+      if (sec < 60){ alert('自定义时长至少为 1 分钟'); return; }
+      state.examSec = sec;
+    }
+    state.prepSec = $('#prepCheck').checked ? 300 : 3;
+    unlockAudio();
+    beginPrep();
+  });
+
+  $('#submitBtn').addEventListener('click', function(){
+    if (state.phase === 'exam'){
+      showModal('提前交卷', '确定要提前交卷吗？交卷后本次模拟考试结束，无法继续作答。', '继续作答', '确定交卷');
+    }
+  });
+  $('#abortPrepBtn').addEventListener('click', function(){
+    if (state.phase === 'prep'){
+      showModal('放弃本次考试', '确定要放弃本次考试吗？点击后将返回首页，本次考前准备作废。', '继续准备', '确定放弃');
+    }
+  });
+  $('#backBtn').addEventListener('click', function(){
+    switchView('setup');
+  });
+
+  /* ---------- 防误关 ---------- */
+  window.addEventListener('beforeunload', function(e){
+    if (state.phase === 'prep' || state.phase === 'exam'){
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  /* ---------- 恢复上次设置 ---------- */
+  (function restore(){
+    try {
+      var saved = JSON.parse(localStorage.getItem('examSimSettings') || 'null');
+      if (saved){
+        if (saved.subject && saved.subject !== '__custom__'){
+          $('#subjectSel').value = saved.subject;
+        } else if (saved.subject === '__custom__' && saved.subjectCustom){
+          $('#subjectSel').value = '__custom__';
+          $('#subjectCustom').style.display = '';
+          $('#subjectCustom').value = saved.subjectCustom;
+        }
+        if (saved.name) $('#examName').value = saved.name;
+        if (saved.prep !== undefined) $('#prepCheck').checked = !!saved.prep;
+        if (saved.customOn && saved.examSec){
+          setCustom(true);
+          state.examSec = saved.examSec;
+          $('#customH').value = Math.floor(saved.examSec/3600);
+          $('#customM').value = Math.round(saved.examSec%3600/60);
+        } else {
+          applySubjectDefault();
+        }
+      } else {
+        applySubjectDefault();
+      }
+    } catch(e){ applySubjectDefault(); }
+  })();
+
+  /* ---------- 保存设置 ---------- */
+  function saveSettings(){
+    var sub = $('#subjectSel').value;
+    localStorage.setItem('examSimSettings', JSON.stringify({
+      subject: sub,
+      subjectCustom: $('#subjectCustom').value,
+      name: $('#examName').value,
+      examSec: state.examSec,
+      customOn: state.customOn,
+      prep: $('#prepCheck').checked
+    }));
+  }
+  $('#subjectSel').addEventListener('change', saveSettings);
+  $('#examName').addEventListener('change', saveSettings);
+  $('#startBtn').addEventListener('click', saveSettings);
+
+  /* ---------- 黑板信息 ---------- */
+  function syncBoard(){
+    var sub = $('#subjectSel').value;
+    if (sub === '__custom__') sub = $('#subjectCustom').value || '自选科目';
+    $('#examBoardSub').textContent = sub;
+    $('#examBoardName').textContent = $('#examName').value || '普通高等学校招生全国统一考试';
+  }
+  $('#startBtn').addEventListener('click', syncBoard);
+  $('#subjectSel').addEventListener('change', syncBoard);
+  $('#examName').addEventListener('change', syncBoard);
+
+  /* ===== 全屏按钮（右下角，鼠标靠近浮现；全屏时鼠标自动隐藏） ===== */
+  var fsBtn = $('#fsBtn');
+  var fsCursorTimer = null;
+  function fsShowCursor(){
+    document.documentElement.classList.remove('fs-idle');
+    if (fsCursorTimer){ clearTimeout(fsCursorTimer); fsCursorTimer = null; }
+    if (document.fullscreenElement){
+      fsCursorTimer = setTimeout(function(){ document.documentElement.classList.add('fs-idle'); }, 2200);
+    }
+  }
+  document.addEventListener('mousemove', function(e){
+    var nearCorner = e.clientX > (window.innerWidth - 160) && e.clientY > (window.innerHeight - 70);
+    fsBtn.classList.toggle('show', nearCorner);
+    fsShowCursor();
+  });
+  function updateFsBtn(){
+    if (document.fullscreenElement){ fsBtn.textContent = '退出全屏'; fsBtn.title = '退出全屏'; }
+    else { fsBtn.textContent = '全屏显示'; fsBtn.title = '全屏显示'; }
+  }
+  fsBtn.addEventListener('click', function(){
+    if (document.fullscreenElement){
+      if (document.exitFullscreen) document.exitFullscreen();
+    } else {
+      if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    }
+  });
+  document.addEventListener('fullscreenchange', function(){
+    updateFsBtn();
+    if (!document.fullscreenElement){ document.documentElement.classList.remove('fs-idle'); }
+  });
+  updateFsBtn();
+})();
+</script>
+
+</body>
+</html>
